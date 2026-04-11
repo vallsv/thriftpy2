@@ -6,6 +6,7 @@ from libc.stdlib cimport free, malloc
 from libc.stdint cimport int16_t, int32_t, int64_t
 from libc.string cimport memcpy
 from cpython cimport bool, PyObject_GetBuffer, PyBuffer_Release, PyBUF_ANY_CONTIGUOUS, PyBUF_SIMPLE
+from cython.cimports.cython.view import array as cvarray
 
 from thriftpy2.thrift import TDecodeException
 from thriftpy2.transport.cybase cimport CyTransportBase, STACK_STRING_LEN
@@ -251,7 +252,7 @@ cdef inline write_struct(CyTransportBase buf, obj):
     write_i08(buf, T_STOP)
 
 
-cdef inline c_read_binary(CyTransportBase buf, int32_t size):
+cdef inline c_read_bytes(CyTransportBase buf, int32_t size):
     cdef char string_val[STACK_STRING_LEN]
 
     if size > STACK_STRING_LEN:
@@ -268,15 +269,30 @@ cdef inline c_read_binary(CyTransportBase buf, int32_t size):
     return py_data
 
 
+cdef inline c_read_memoryview(CyTransportBase buf, int32_t size):
+    array = cvarray(shape=(size,), itemsize=sizeof(char), format="b")
+    cdef char[:] mview = array
+    buf.c_read(size, &mview[0])
+    return mview
+
+
+cdef inline c_read_binary(CyTransportBase buf, int32_t size):
+    # if size > 128 * 1024:
+    #     return c_read_memoryview(buf, size)
+    # else:
+    #     return c_read_bytes(buf, size)
+    return c_read_memoryview(buf, size)
+
+
 cdef inline c_read_string(CyTransportBase buf, int32_t size,
                           strict_decode=False):
-    py_data = c_read_binary(buf, size)
+    py_data = c_read_memoryview(buf, size)
     try:
-        return (<char *>py_data)[:size].decode("utf-8")
+        return str(py_data, "utf-8")
     except:  # noqa
         if strict_decode:
             raise
-        return py_data
+        return py_data.tobytes()
 
 
 cdef c_read_val(CyTransportBase buf, TType ttype, spec=None,
@@ -308,14 +324,17 @@ cdef c_read_val(CyTransportBase buf, TType ttype, spec=None,
 
     elif ttype == T_BINARY:
         size = read_i32(buf)
-        return c_read_binary(buf, size)
+        r = c_read_binary(buf, size)
+        # r = c_read_memoryview(buf, size)
+        # print(type(r))
+        return r
 
     elif ttype == T_STRING:
         size = read_i32(buf)
         if decode_response:
             return c_read_string(buf, size, strict_decode)
         else:
-            return c_read_binary(buf, size)
+            return c_read_bytes(buf, size)
 
     elif ttype == T_SET or ttype == T_LIST:
         if isinstance(spec, int):
