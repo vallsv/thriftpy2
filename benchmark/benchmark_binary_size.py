@@ -1,3 +1,4 @@
+import sys
 import os
 import time
 import numpy
@@ -21,6 +22,19 @@ def make_ndarray(array: numpy.ndarray):
     return msg
 
 
+def decode_numpy(msg, enforce_writable: bool) -> numpy.ndarray:
+    array = numpy.frombuffer(
+        msg.buffer,
+        msg.dtype,
+    )
+
+    if enforce_writable and not array.flags.writeable:
+        # if the buffer is not writable (from bytes)
+        # we have to copy the memory
+        array = numpy.array(array)
+
+    array.shape = msg.shape
+    return array
 
 
 SIZES = [
@@ -52,7 +66,12 @@ SIZES = [
 ]
 
 
-def decode(n, proto_factory):
+def decode(
+    proto_factory,
+    n=1,
+    as_numpy_array=False,
+    as_writable=False,
+):
     ab = ndarray.NDArray()
     for size in SIZES:
         data = numpy.random.randint(0, 255, size=size, dtype=numpy.uint8)
@@ -60,19 +79,50 @@ def decode(n, proto_factory):
         durations = []
         for i in range(n):
             start = time.time()
-            deserialize(ab, array_encoded, proto_factory)
+            result = deserialize(ab, array_encoded, proto_factory)
+            if as_numpy_array:
+                result = decode_numpy(result, enforce_writable=as_writable)
             end = time.time()
             durations.append(end - start)
+            if i == 0:
+                # sanity check only once
+                if as_numpy_array:
+                    numpy.testing.assert_allclose(data, result)
+
         duration = numpy.mean(durations)
         print(f"{type(proto_factory).__name__}\t{size}\t{duration}")
 
 
 def main():
-    n = 5
+    args = ""
+    if len(sys.argv) > 1:
+        args = sys.argv[1]
 
-    decode(n, TBinaryProtocolFactory())
-    decode(n, TCyBinaryProtocolFactory())
-    decode(n, TCyBinaryProtocolFactory2())
+    n = 5  # 100
+    as_writable = "w" in args
+    as_numpy_array = "n" in args
+
+    print("Benchmark for binary decoding")
+    print(f"  - Median from {n} iterations")
+    if as_numpy_array:
+        print("  - Decode as numpy array")
+        if as_writable:
+            print("  - Enforce writable numpy array")
+    print()
+
+    proto_factorys = [
+        TBinaryProtocolFactory(),
+        TCyBinaryProtocolFactory(),
+        TCyBinaryProtocolFactory2(),
+    ]
+
+    for proto_factory in proto_factorys:
+        decode(
+            proto_factory=proto_factory,
+            n=n,
+            as_numpy_array=as_numpy_array,
+            as_writable=as_writable,
+        )
 
 
 if __name__ == "__main__":
