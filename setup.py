@@ -40,6 +40,7 @@ if not PYPY:
     cythonize("thriftpy2/transport/cybase.pyx")
     cythonize("thriftpy2/transport/**/*.pyx")
     cythonize("thriftpy2/protocol/cybin/cybin.pyx")
+    cythonize("thriftpy2/protocol/cybin2/cybin2.pyx")
 
     libraries = []
     if WINDOWS:
@@ -58,6 +59,9 @@ if not PYPY:
                                  ["thriftpy2/transport/sasl/cysasl.c"]))
     ext_modules.append(Extension("thriftpy2.protocol.cybin.cybin",
                                  ["thriftpy2/protocol/cybin/cybin.c"],
+                                 libraries=libraries))
+    ext_modules.append(Extension("thriftpy2.protocol.cybin2.cybin2",
+                                 ["thriftpy2/protocol/cybin2/cybin2.c"],
                                  libraries=libraries))
 
 setup(
