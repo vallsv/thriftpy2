@@ -2,7 +2,8 @@ import time
 
 import thriftpy2
 from thriftpy2.utils import serialize, deserialize
-from thriftpy2.protocol import TBinaryProtocolFactory, TCyBinaryProtocolFactory
+from thriftpy2.protocol.binary import TBinaryProtocolFactory
+from thriftpy2.protocol.cybin import TCyBinaryProtocolFactory
 
 addressbook = thriftpy2.load("addressbook.thrift")
 
