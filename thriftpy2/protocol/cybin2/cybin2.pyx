@@ -278,13 +278,28 @@ cdef inline c_read_binary_as_memoryview(CyTransportBase buf, int32_t size):
 
 cdef inline c_read_string(CyTransportBase buf, int32_t size,
                           strict_decode=False):
-    py_data = c_read_binary_as_bytes(buf, size)
-    try:
-        return (<char *>py_data)[:size].decode("utf-8")
-    except:  # noqa
-        if strict_decode:
-            raise
-        return py_data
+    cdef char string_val[STACK_STRING_LEN]
+
+    if size > STACK_STRING_LEN:
+        data = <char*>malloc(size)
+        try:
+            buf.c_read(size, data)
+            try:
+                return data[:size].decode("utf-8")
+            except:  # noqa
+                if strict_decode:
+                    raise
+                return data[:size]
+        finally:
+            free(data)
+    else:
+        buf.c_read(size, string_val)
+        try:
+            return string_val[:size].decode("utf-8")
+        except:  # noqa
+            if strict_decode:
+                raise
+            return string_val[:size]
 
 
 cdef c_read_val(CyTransportBase buf, TType ttype, spec=None,
