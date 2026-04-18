@@ -50,6 +50,8 @@ if not PYPY:
                                  ["thriftpy2/transport/cybase.c"]))
     ext_modules.append(Extension("thriftpy2.transport.buffered.cybuffered",
                                  ["thriftpy2/transport/buffered/cybuffered.c"]))
+    ext_modules.append(Extension("thriftpy2.transport.chunked.cychunked",
+                                 ["thriftpy2/transport/chunked/cychunked.c"]))
     ext_modules.append(Extension("thriftpy2.transport.memory.cymemory",
                                  ["thriftpy2/transport/memory/cymemory.c"]))
     ext_modules.append(Extension("thriftpy2.transport.framed.cyframed",
