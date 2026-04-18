@@ -342,6 +342,7 @@ def read_struct(inbuf, obj, decode_response=True, strict_decode=False):
         setattr(obj, f_name,
                 read_val(inbuf, f_type, f_container_spec, decode_response,
                          strict_decode))
+    return obj
 
 
 def skip(inbuf, ftype):
