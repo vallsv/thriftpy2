@@ -132,6 +132,35 @@ class TSocket(object):
                                       message='TSocket read 0 bytes')
         return buff
 
+    def read_into(self, sz, buf):
+        """
+        Read up to `sz` amount of bytes into a pre-allocated `buf` buffer.
+        """
+        while True:
+            try:
+                size = self.sock.recv_into(buf, sz)
+            except socket.error as e:
+                if e.errno == errno.EINTR:
+                    continue
+                if e.args[0] == errno.ECONNRESET and MAC_OR_BSD:
+                    # freebsd and Mach don't follow POSIX semantic of recv
+                    # and fail with ECONNRESET if peer performed shutdown.
+                    # See corresponding comment and code in TSocket::read()
+                    # in lib/cpp/src/transport/TSocket.cpp.
+                    self.close()
+                    # Trigger the check to raise the END_OF_FILE exception.
+                    size = 0
+                    break
+                else:
+                    raise
+            else:
+                break
+
+        if size == 0:
+            raise TTransportException(type=TTransportException.END_OF_FILE,
+                                      message='TSocket read 0 bytes')
+        return size
+
     def write(self, buff):
         self.sock.sendall(buff)
 

@@ -2,6 +2,7 @@
 
 from libc.stdlib cimport malloc, free
 from libc.string cimport memcpy, memmove
+from cpython cimport PyObject_GetBuffer, PyBuffer_Release, PyBUF_ANY_CONTIGUOUS, PyBUF_SIMPLE, PyBUF_WRITABLE
 
 
 cdef class TCyBuffer(object):
@@ -138,3 +139,12 @@ cdef class CyTransportBase(object):
         else:
             size = self.c_read(sz, out)
             return out[:size]
+
+    def read_into(self, int sz, buf):
+        cdef Py_ssize_t size
+        cdef Py_buffer out_buffer
+        PyObject_GetBuffer(buf, &out_buffer, PyBUF_SIMPLE | PyBUF_ANY_CONTIGUOUS | PyBUF_WRITABLE)
+        try:
+            self.c_read(sz, <char *>out_buffer.buf)
+        finally:
+            PyBuffer_Release(&out_buffer)

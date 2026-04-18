@@ -23,6 +23,20 @@ def readall(read_fn, sz):
     return buff
 
 
+def readall_into(read_info_fn, sz, buf):
+    """
+    Read a fixed `sz` amount of bytes into a pre-allocated `buf` buffer.
+    """
+    have = 0
+    while have < sz:
+        nbytes = read_info_fn(sz - have, buf[have:])
+        have += nbytes
+
+        if nbytes == 0:
+            raise TTransportException(TTransportException.END_OF_FILE,
+                                      "End of file reading from transport")
+
+
 class TTransportFactory(Protocol):
     """Transport factory interface for type annotations."""
 
@@ -53,6 +67,12 @@ class TTransportBase(object):
         """
         Internal read method which can read up to `sz` bytes but doesn't
         need to return them all.
+        """
+        raise NotImplementedError
+
+    def read_into(self, sz: int, buf: memoryview):
+        """
+        Read a fixed `sz` amount of bytes into a pre-allocated `buf` buffer.
         """
         raise NotImplementedError
 

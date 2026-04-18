@@ -39,6 +39,14 @@ class TMemoryBuffer(TTransportBase):
         self._pos += len(res)
         return res
 
+    def read_into(self, sz, buf):
+        orig_pos = self._buffer.tell()
+        self._buffer.seek(self._pos)
+        res = self._buffer.readinto(memoryview(buf)[0:sz])
+        self._buffer.seek(orig_pos)
+        self._pos += res
+        return res
+
     def write(self, buf):
         self._buffer.write(buf)
 
