@@ -94,7 +94,8 @@ cdef class TCyFramedTransport(CyTransportBase):
             size = htobe32(self.wframe_buf.data_size)
             size_str = <char*>(&size)
 
-            self.trans.write(size_str[:4] + data)
+            self.trans.write(size_str[:4])
+            self.trans.write(data)
             self.trans.flush()
             self.wframe_buf.clean()
 
