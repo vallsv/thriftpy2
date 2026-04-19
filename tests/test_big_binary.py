@@ -14,6 +14,7 @@ from unittest import TestCase
 import thriftpy2
 from thriftpy2.rpc import client_context, make_server
 from thriftpy2.transport.buffered import TBufferedTransportFactory
+from thriftpy2.transport.chunked import TChunkedTransportFactory
 from thriftpy2.protocol.binary import TBinaryProtocolFactory
 
 from thriftpy2._compat import CYTHON
@@ -33,6 +34,7 @@ class Dispatcher:
 
 @pytest.mark.skipif(sys.platform == "win32", reason="requires fork")
 class BufferedTransportTestCase(TestCase):
+    READ_INTO = False
     TRANSPORT_FACTORY = TBufferedTransportFactory()
     PROTOCOL_FACTORY = TBinaryProtocolFactory()
 
@@ -84,11 +86,35 @@ class BufferedTransportTestCase(TestCase):
             size = c.size(data)
             assert size == 10_000_000
 
+    def test_prepare_buffer(self):
+        if not self.READ_INTO:
+            pytest.skip("Have to be implemented")
+
+        def prepare_buffer(obj, attr_name):
+            if attr_name == "data":
+                obj.prepared_data = bytearray(obj.size)
+                return memoryview(obj.prepared_data)
+            return None
+
+        big_binary.Data._prepare_buffer = prepare_buffer
+
+        data = big_binary.Data(size=4, data=b'abcd')
+        with self.client() as c:
+            data2 = c.echo(data)
+            assert data.data == data2.prepared_data
+
+
+class TChunkedTransportTestCase(BufferedTransportTestCase):
+    READ_INTO = True
+    TRANSPORT_FACTORY = TChunkedTransportFactory()
+    PROTOCOL_FACTORY = TBinaryProtocolFactory()
+
 
 if CYTHON:
     from thriftpy2.transport.buffered import TCyBufferedTransportFactory
     from thriftpy2.protocol.cybin import TCyBinaryProtocolFactory
 
     class TCyBufferedTransportTestCase(BufferedTransportTestCase):
+        READ_INTO = False
         TRANSPORT_FACTORY = TCyBufferedTransportFactory()
         PROTOCOL_FACTORY = TCyBinaryProtocolFactory()

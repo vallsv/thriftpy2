@@ -217,7 +217,7 @@ def read_map_begin(inbuf):
 
 
 def read_val(inbuf, ttype, spec=None, decode_response=True,
-             strict_decode=False):
+             strict_decode=False, buf=None):
     if ttype == TType.BOOL:
         return bool(unpack_i8(inbuf.read(1)))
 
@@ -238,7 +238,10 @@ def read_val(inbuf, ttype, spec=None, decode_response=True,
 
     elif ttype == TType.BINARY:
         sz = unpack_i32(inbuf.read(4))
-        return inbuf.read(sz)
+        if buf is None:
+            return inbuf.read(sz)
+        else:
+            return inbuf.read_into(sz, buf)
 
     elif ttype == TType.STRING:
         sz = unpack_i32(inbuf.read(4))
@@ -315,6 +318,9 @@ def read_val(inbuf, ttype, spec=None, decode_response=True,
 
 
 def read_struct(inbuf, obj, decode_response=True, strict_decode=False):
+    # Allow the structure to prepare a buffer for an attribute
+    prepare_buffer = getattr(obj, "_prepare_buffer", None)
+
     while True:
         f_type, fid = read_field_begin(inbuf)
         if f_type == TType.STOP:
@@ -339,9 +345,15 @@ def read_struct(inbuf, obj, decode_response=True, strict_decode=False):
                 skip(inbuf, f_type)
                 continue
 
+        # Allow the structure to prepare a buffer for an attribute
+        if prepare_buffer is not None:
+            out_buf = prepare_buffer(f_name)
+        else:
+            out_buf = None
+
         setattr(obj, f_name,
                 read_val(inbuf, f_type, f_container_spec, decode_response,
-                         strict_decode))
+                         strict_decode, out_buf))
     return obj
 
 
