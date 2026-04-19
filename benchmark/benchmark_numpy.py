@@ -22,7 +22,22 @@ def make_ndarray(array: numpy.ndarray):
     return msg
 
 
-def decode_numpy(msg, enforce_writable: bool) -> numpy.ndarray:
+def NDArray_prepare_buffer(obj, attr_name: bytes) -> memoryview | None:
+    """
+    Prepare the memory for the buffer.
+    """
+    if attr_name == "buffer":
+        array = numpy.empty(obj.shape, dtype=obj.dtype)
+        obj.array = array
+        return memoryview(array.data)
+
+    return None
+
+
+def decode_numpy(msg, enforce_writable: bool, enforce_prepared: bool) -> numpy.ndarray:
+    if enforce_prepared:
+        return msg.array
+
     array = numpy.frombuffer(
         msg.buffer,
         msg.dtype,
@@ -81,38 +96,52 @@ def mean_without_outliers(dd):
     return float(vmean)
 
 
+ab = ndarray.NDArray()
+
+
 def decode(
+    name: str,
+    size: int,
     proto_factory,
     min_n=1,
     min_time=None,
     as_numpy_array=False,
     as_writable=False,
+    as_prepared=False,
 ):
-    ab = ndarray.NDArray()
-    for size in SIZES:
-        data = numpy.random.randint(0, 255, size=size, dtype=numpy.uint8)
-        array_encoded = serialize(make_ndarray(data))
-        durations = []
-        start_test = time.time()
-        i = 0
-        while True:
-            d = time.time() - start_test
-            if i >= min_n and (min_time is None or d > min_time):
-                break
-            start = time.time()
-            result = deserialize(ab, array_encoded, proto_factory)
-            if as_numpy_array:
-                result = decode_numpy(result, enforce_writable=as_writable)
-            end = time.time()
-            durations.append(end - start)
-            if i == 0:
-                # sanity check only once
-                if as_numpy_array:
-                    numpy.testing.assert_allclose(data, result)
-            i = i + 1
+    if as_prepared:
+        ndarray.NDArray._prepare_buffer = NDArray_prepare_buffer
+    else:
+        if hasattr(ndarray.NDArray, "_prepare_buffer"):
+            delattr(ndarray.NDArray, "_prepare_buffer")
 
-        duration = mean_without_outliers(durations)
-        print(f"{type(proto_factory).__name__}\t{size}\t{i}\t{duration}")
+    data = numpy.random.randint(0, 255, size=size, dtype=numpy.uint8)
+    array_encoded = serialize(make_ndarray(data))
+    durations = []
+    start_test = time.time()
+    i = 0
+    while True:
+        d = time.time() - start_test
+        if i >= min_n and (min_time is None or d > min_time):
+            break
+        start = time.time()
+        result = deserialize(ab, array_encoded, proto_factory)
+        if as_numpy_array:
+            result = decode_numpy(
+                result,
+                enforce_writable=as_writable,
+                enforce_prepared=as_prepared,
+            )
+        end = time.time()
+        durations.append(end - start)
+        if i == 0:
+            # sanity check only once
+            if as_numpy_array:
+                numpy.testing.assert_allclose(data, result)
+        i = i + 1
+
+    duration = mean_without_outliers(durations)
+    print(f"{name:<12s}\t{size}\t{i}\t{duration}")
 
 
 def main():
@@ -140,20 +169,26 @@ def main():
             print("  - Enforce writable numpy array")
     print()
 
-    proto_factories = [
-        TBinaryProtocolFactory(),
-        TCyBinaryProtocolFactory(),
-        TCyBinaryProtocolFactory2(),
+    options_series = [
+        ("bin-py", TBinaryProtocolFactory(), False),
+        ("bin-cy", TCyBinaryProtocolFactory(), False),
+        ("binp-cy", TCyBinaryProtocolFactory2(), False),
+        ("bin-py-pref", TBinaryProtocolFactory(), True),
     ]
 
-    for proto_factory in proto_factories:
-        decode(
-            proto_factory=proto_factory,
-            min_n=min_n,
-            min_time=min_time,
-            as_numpy_array=as_numpy_array,
-            as_writable=as_writable,
-        )
+    for size in SIZES:
+        for options in options_series:
+            name, proto_factory, as_prepared = options
+            decode(
+                name=name,
+                size=size,
+                proto_factory=proto_factory,
+                min_n=min_n,
+                min_time=min_time,
+                as_numpy_array=as_numpy_array,
+                as_writable=as_writable,
+                as_prepared=as_prepared,
+            )
 
 
 if __name__ == "__main__":
