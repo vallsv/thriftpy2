@@ -3,6 +3,8 @@
 from libc.stdlib cimport malloc, free
 from libc.string cimport memcpy, memmove
 from cpython cimport PyObject_GetBuffer, PyBuffer_Release, PyBUF_ANY_CONTIGUOUS, PyBUF_SIMPLE, PyBUF_WRITABLE
+from cpython.memoryview cimport PyMemoryView_FromMemory
+from cpython.buffer cimport PyBUF_WRITE
 
 
 cdef class TCyBuffer(object):
@@ -83,6 +85,24 @@ cdef class TCyBuffer(object):
         memcpy(out, self.buf + self.cur, sz)
         self.cur += sz
         self.data_size -= sz
+
+        return sz
+
+    cdef read_trans2(self, trans, int sz, char *out):
+        # WIP
+        cdef int remaining, size
+
+        if sz <= 0:
+            return 0
+
+        view = PyMemoryView_FromMemory(out, sz, PyBUF_WRITE)
+        remaining = sz
+        while remaining:
+            size = trans.read_into(remaining, view)
+            view = view[size:]
+            if size <= 0:
+                return -1  # end of file error
+            remaining -= size
 
         return sz
 

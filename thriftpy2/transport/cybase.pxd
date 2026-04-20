@@ -14,6 +14,7 @@ cdef class TCyBuffer(object):
         int write(self, int sz, const char *value)
         int grow(self, int min_size)
         read_trans(self, trans, int sz, char *out)
+        read_trans2(self, trans, int sz, char *out)
 
 
 cdef class CyTransportBase(object):
