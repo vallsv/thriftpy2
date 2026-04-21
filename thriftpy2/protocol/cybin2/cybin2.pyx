@@ -192,6 +192,9 @@ cdef inline read_struct(CyTransportBase buf, obj, decode_response=True,
     cdef tuple field_spec
     cdef str name
 
+    # Allow the structure to prepare a buffer for an attribute
+    prepare_buffer = getattr(obj, "_prepare_buffer", None)
+
     while True:
         field_type = <TType>read_i08(buf)
         if field_type == T_STOP:
@@ -214,8 +217,14 @@ cdef inline read_struct(CyTransportBase buf, obj, decode_response=True,
         else:
             spec = field_spec[2]
 
+        # Allow the structure to prepare a buffer for an attribute
+        if prepare_buffer is not None:
+            out_buf = prepare_buffer(name)
+        else:
+            out_buf = None
+
         setattr(obj, name, c_read_val(buf, ttype, spec, decode_response,
-                                      strict_decode))
+                                      strict_decode, out_buf))
 
     return obj
 
@@ -276,6 +285,11 @@ cdef inline c_read_binary_as_memoryview(CyTransportBase buf, int32_t size):
     return mview
 
 
+cdef inline c_read_binary_into(CyTransportBase buf, int32_t size, char[:] out_buf):
+    buf.c_read(size, &out_buf[0])
+    return out_buf
+
+
 cdef inline c_read_string(CyTransportBase buf, int32_t size,
                           strict_decode=False):
     cdef char string_val[STACK_STRING_LEN]
@@ -303,7 +317,7 @@ cdef inline c_read_string(CyTransportBase buf, int32_t size,
 
 
 cdef c_read_val(CyTransportBase buf, TType ttype, spec=None,
-                decode_response=True, strict_decode=False):
+                decode_response=True, strict_decode=False, out_buf=None):
     cdef int size
     cdef int64_t n
     cdef TType v_type, k_type, orig_type, orig_key_type
@@ -331,7 +345,11 @@ cdef c_read_val(CyTransportBase buf, TType ttype, spec=None,
 
     elif ttype == T_BINARY:
         size = read_i32(buf)
-        return c_read_binary_as_memoryview(buf, size)
+        if out_buf is None:
+            return c_read_binary_as_memoryview(buf, size)
+        else:
+            # FIXME: Here we could check that the buffer have the right size
+            return c_read_binary_into(buf, size, out_buf)
 
     elif ttype == T_STRING:
         size = read_i32(buf)

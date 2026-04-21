@@ -34,7 +34,6 @@ class Dispatcher:
 
 @pytest.mark.skipif(sys.platform == "win32", reason="requires fork")
 class BufferedTransportTestCase(TestCase):
-    READ_INTO = False
     TRANSPORT_FACTORY = TBufferedTransportFactory()
     PROTOCOL_FACTORY = TBinaryProtocolFactory()
 
@@ -87,9 +86,6 @@ class BufferedTransportTestCase(TestCase):
             assert size == 10_000_000
 
     def test_prepare_buffer(self):
-        if not self.READ_INTO:
-            pytest.skip("Have to be implemented")
-
         def prepare_buffer(obj, attr_name):
             if attr_name == "data":
                 obj.prepared_data = bytearray(obj.size)
@@ -105,16 +101,14 @@ class BufferedTransportTestCase(TestCase):
 
 
 class TChunkedTransportTestCase(BufferedTransportTestCase):
-    READ_INTO = True
     TRANSPORT_FACTORY = TChunkedTransportFactory()
     PROTOCOL_FACTORY = TBinaryProtocolFactory()
 
 
 if CYTHON:
     from thriftpy2.transport.buffered import TCyBufferedTransportFactory
-    from thriftpy2.protocol.cybin import TCyBinaryProtocolFactory
+    from thriftpy2.protocol.cybin2 import TCyBinaryProtocolFactory2
 
     class TCyBufferedTransportTestCase(BufferedTransportTestCase):
-        READ_INTO = False
         TRANSPORT_FACTORY = TCyBufferedTransportFactory()
-        PROTOCOL_FACTORY = TCyBinaryProtocolFactory()
+        PROTOCOL_FACTORY = TCyBinaryProtocolFactory2()
