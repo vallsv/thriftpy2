@@ -45,6 +45,22 @@ class TBufferedTransport(TTransportBase):
         self._rbuf = BytesIO(buf)
         return ret
 
+    def read_into(self, sz: int, buf: memoryview):
+        buf = buf[:sz]
+        ret = self._rbuf.readinto(buf)
+        if ret is None:
+            raise MemoryError("Write to buffer error")
+
+        rest_len = sz - ret
+        if rest_len == 0:
+            return ret
+
+        newbuf = self._trans.read(max(rest_len, self._buf_size))
+        buf[ret:] = newbuf[:rest_len]
+        self._rbuf = BytesIO(newbuf[rest_len:])
+
+        return ret
+
     def write(self, buf):
         self._wbuf.write(buf)
 
