@@ -124,6 +124,22 @@ cdef class TCyBuffer(object):
         self.buf = new_buf
         return 0
 
+    cdef int move_into(self, int max, char *out):
+        """
+        Move up to `max` from this buffer into the `out` buffer.
+
+        Return the amount of moved bytes.
+        """
+        cdef size
+        size = min(max, self.data_size)
+        memcpy(out, self.buf + self.cur, size)
+        self.data_size -= size
+        if self.data_size == 0:
+            self.cur = 0
+        else:
+            self.cur += size
+        return size
+
 
 cdef class CyTransportBase(object):
     cdef c_read(self, int sz, char* out):

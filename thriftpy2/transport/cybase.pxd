@@ -13,6 +13,7 @@ cdef class TCyBuffer(object):
         void clean(self)
         int write(self, int sz, const char *value)
         int grow(self, int min_size)
+        int move_into(self, int max, char *out)
         read_trans(self, trans, int sz, char *out)
         read_trans2(self, trans, int sz, char *out)
 
